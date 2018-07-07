@@ -7,4 +7,4 @@ The Server.kt is a RESTful server that utilizes a gradle project build script, t
 done in my client code, which encodes objects into JSON and sends the information to be processed by the server. Once the JSON
 has been recieved server side, it will then be converted back into a useful Object, or it will be processed in some other way.
 Once this is done, depending on the task at hand, the server code will call a function from the other team members database API.
-******************************************************************
+***********************************************************************************************************
