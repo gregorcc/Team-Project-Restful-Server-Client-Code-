@@ -1,0 +1,28 @@
+Please only look at backendInterface.kt file for communicating with Backend. 
+You will find basic esentials function call over there NOT IN ANY OTHER FILE.
+
+If you are unsure of Interfaces,then to make use of the BackEnd File - "backendInterface.kt", try this in you code:
+
+val backEnd = backendInterface
+//Now use this variable to get function calls according to your necessity.
+//For example: 
+//  backEnd.createUser(Profile(user: User): String 
+//  this should return a string saying if it's successful or not.
+
+//If you want any information whatever you have done so far to be saved for future please make sure to add the following command:
+
+backEnd.shutdown()
+
+//without these command the backEnd is not responsible for saving you responses or user Data or Survey Questions.
+
+NOTE: The dataBase is set to have no information whatsoever when you download this repo. So first thing to do is create an user, 
+        create survey questions, try logging in an user and then try adding responses. After you done running your code you MUST 
+        CALL backEndInterface.shutdown() TO SAVE YOUR WORK OR PROGRESS
+
+Now, since we are usingle SINGLETON to reduce multiple read and write commands to the database, 
+    we need to change our compile time constants. Basically don't create another instance of class backendInterface because 
+    your compiler will not initialize the private variables again. Rather it will use the previous object's refernce.
+
+ALSO PASTE THE FOLLOWING IN GRADLE:
+//Gradle
+//compile group: 'org.apache.commons', name: 'commons-email', version: '1.1'
