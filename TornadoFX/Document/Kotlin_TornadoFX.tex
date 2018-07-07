@@ -1,0 +1,626 @@
+\documentclass[12pt]{article}
+\usepackage[english]{babel}
+\usepackage{listings}
+\usepackage[dvipsnames]{xcolor}
+
+
+%this code came from https://github.com/cansik/kotlin-latex-listing
+\lstdefinelanguage{Kotlin}{
+  keywords={package, as, as?, typealias, this, super, val, var, fun, for, null, true, false, is, in, throw, return, break, continue, if, try, else, while, do, when, class, interface, enum, object, companion, override, public, private, open, sealed, get, set, import, abstract, vararg, expect, extend, actual, where, suspend, data, internal, dynamic, final, by, find, close},
+  keywordstyle=\color{Fuchsia}\bfseries,
+  ndkeywords={@Deprecated, @JvmName, @JvmStatic, @JvmOverloads, @JvmField, @JvmSynthetic, Iterable, Int, Long, Integer, Short, Byte, Float, Double, String, Runnable, Array, T, Unit, Observable,View, Controller, Fragment},
+  ndkeywordstyle=\color{Red}\bfseries,
+  emph={print, println, return@, forEach, map, mapNotNull, first, filter, firstOrNull, lazy, delegate, init, with, apply, sumBy, let, max, min, sum, maxBy, minBy, joinToString, toString, action},
+  emphstyle={\color{BurntOrange}},
+  emph={[2]it, key, value, self, mapKey, mapValue, counts, main, root, vbox, hbox, button, label, Color, Font},
+  emphstyle={[2]\color{Aquamarine}\bfseries},
+  identifierstyle=\color{black},
+  sensitive=true,
+  commentstyle=\color{SpringGreen}\ttfamily,
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  stringstyle=\color{OliveGreen}\ttfamily,
+  morestring=[b]",
+  morestring=[s]{"""*}{*"""},
+  columns=flexible,
+  tabsize=4,
+  breaklines=true,
+  backgroundcolor=\color{gray!6},
+}
+
+\lstset{
+basicstyle=\ttfamily,
+columns=flexible,
+tabsize=4,
+breaklines=true,
+backgroundcolor=\color{gray!10}
+}
+
+\begin{document}
+\section{TornadoFX}
+
+\subsection{Basic Structure}
+\begin{lstlisting}
+Components:
+	-> Application: the entry point is "App" and specifies the initial "View"
+		-> Stage: 
+		-> Scene:
+			-> Model: The business code layer that holds core logic and data
+			-> View: The visual display with various input and output controls
+			-> Cotroller:The "middleman" mediating events between the Model and the View
+			-> Fragment: The pop-ups
+\end{lstlisting}
+\subsection{View}
+Many components are automatically maintained as singletons.
+
+\begin{lstlisting}[language=Kotlin]
+Extend App: class MyApp: App(MyView::class)
+\end{lstlisting}
+View contains display logic and layout of nodes, it's singleton.
+\\
+When a View is declared, there must be a root property which can be any Parent type, and that will hold the View's content.
+\\
+Use the "plus assign" += operators to add children, such as a Button and Label.
+
+\begin{lstlisting}[language=Kotlin]
+class MyView: View() {
+	override val root = VBox()
+	init {
+		root += Button("Press Me")
+		root += Label("Waiting")
+	}
+}
+\end{lstlisting}
+	A BoderPane contains function TopView and BottomView, which can be embed by inject() delegate property to load other View. Then Each "child" View's root to assign them to the BorderPane.
+
+\begin{lstlisting}[language=Kotlin]
+import javafx.scene.control.Label
+import javafx.scene.layout.BorderPane
+import tornadofx.*
+class MasterView: View() {
+	val topView: TopView by inject()
+	val bottomView: BottomView by inject()
+	//Here is a alter way: use find to insert a View
+	val topView = find(TopView::class)
+	val bottomView = find(BottomView::class)	
+	
+	override val root = BorderPane()
+	init {
+		with(root) {
+			top = topView.root
+			bottom = bottomView.root
+			}
+		}
+	}
+class TopView: View() {
+	override val root = Label("Top View")
+}
+class BottomView: View() {
+	override val root = Label("Bottom View")
+}
+
+\end{lstlisting}
+Here is another alter way to use view builder to insert.
+
+\begin{lstlisting}[language=Kotlin]
+import javafx.scene.control.Label
+import tornadofx.*
+class MasterView : View() {
+	override val root = borderpane {
+		top(TopView::class)
+		bottom(BottomView::class)
+	}
+}
+class TopView: View() {
+	override val root = Label("Top View")
+}
+class BottomView: View() {
+	override val root = Label("Bottom View")
+}
+\end{lstlisting}
+
+\subsection{Controllers}
+Controllers will help to finish a specific task in the back.
+\begin{lstlisting}[language=Kotlin]
+import tornadofx.*
+class MyView : View() {
+	val controller: MyController by inject()
+	override val root = vbox {
+		label("Input")
+		val inputField = textfield()
+		button("Commit") {
+			action {
+				controller.writeToDb(inputField.text)
+				inputField.clear()
+			}
+		}
+	}
+}
+
+// this controller helps to write data
+class MyController: Controller() {
+	fun writeToDb(inputValue: String) {
+	println("Writing $inputValue to database!")
+	}
+}
+\end{lstlisting}
+
+
+\begin{lstlisting}[language=Kotlin]
+import javafx.collections.FXCollections
+import tornadofx.*
+class MyView : View() {
+	val controller: MyController by inject()
+	override val root = vbox {
+		label("My items")
+		listview(controller.values)
+	}
+}
+// this controller helps to write data into local dataset.
+class MyController: Controller() {
+	val values = FXCollections.observableArrayList("Alpha","Beta","Gamma","Delta")
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+val textfield = textfield()
+button("Update text") {
+	action {
+		runAsync {
+			myController.loadText()
+		} ui { loadedText ->
+			textfield.text = loadedText
+		}
+	}
+}
+\end{lstlisting}
+Here is a fragment, which is a a way to do pop-up.
+\begin{lstlisting}[language=Kotlin]
+import javafx.stage.StageStyle
+import tornadofx.*
+class MyView : View() {
+	override val root = vbox {
+		button("Press Me") {
+			action {
+				find(MyFragment::class).openModal(stageStyle = StageStyle.UTILITY)
+				}
+			}
+		}
+	}
+class MyFragment: Fragment() {
+	override val root = label("This is a popup")
+}
+\end{lstlisting}
+This piece of code will open a new window.
+\begin{lstlisting}[language=Kotlin]
+button("Open editor") {
+	action {
+		openInternalWindow(Editor::class)
+	}
+}
+\end{lstlisting}
+
+
+\begin{lstlisting}[language=Kotlin]
+open(), close() \\ Gives the access to open or close window.
+findParentOfType(InternalWindow::class)
+\end{lstlisting}
+By using replaceWith, we can change windows.
+\begin{lstlisting}[language=Kotlin]
+button("Go to MyView2") {
+	action {
+		replaceWith(MyView2::class)
+	}
+}
+\end{lstlisting}
+We can even create some animation.
+\begin{lstlisting}[language=Kotlin]
+replaceWith(MyView1::class, ViewTransition.Slide(0.3.seconds, Direction.LEFT))
+\end{lstlisting}
+onDuck() and onUnDuck() will set action will View being replaced.\\\\
+We can also passing parameters to Views, and we need specify configuring parameters for the target View.
+\begin{lstlisting}[language=Kotlin]
+fun editCustomer(customer: Customer) {
+	find<CustomerEditor>(mapOf(CustomerEditor::customer to customer)).openWindow()
+}
+\end{lstlisting}
+Perform null check for the right parameters.
+\begin{lstlisting}[language=Kotlin]
+class CustomerEditor : Fragment() {
+	init {
+		val customer = params["customer"] as? Customer
+		if (customer != null) {
+		...
+		}
+	}
+}
+\end{lstlisting}
+View has a property called $primaryStage$ that allows you to manipulate properties of the Stage backing it, such as window size. Any View or Fragment that were opened via openModal will also have a $modalStage$ property available.
+
+\subsection{Accessing Resources}
+Lots of JavaFX APIs takes resources as a URL or the toExternalForm of an URL. To retrieve a resource url one would typically write something like:
+
+\begin{lstlisting}[language=Kotlin]
+val myAudioClip = AudioClip(MyView::class.java.getResource("mysound.wav").toExternalForm())
+\end{lstlisting}
+However, in TornadoFX every Component has resources function!
+\begin{lstlisting}[language=Kotlin]
+val myAudiClip = AudioClip(resources["mysound.wav"])
+
+val myResourceURL = resources.url("mysound.wav")
+
+val myJsonObject = resources.json("myobject.json")
+
+val myJsonArray = resources.jsonArray("myarray.json")
+
+val myStream = resources.stream("somefile")
+\end{lstlisting}
+Keyword with can be use to help assign components.
+\begin{lstlisting}[language=Kotlin]
+import javafx.scene.control.Button
+import javafx.scene.layout.VBox
+import tornadofx.*
+class MyView : View() {
+    override val root = VBox()
+    init {
+        with(root) {
+            this += Button("Press Me")
+        }
+        // OR
+        root.apply {
+			this += Button("Press Me").apply {
+                textFill = Color.RED
+                action { println("Button pressed!") }
+            }
+		}
+    }
+}
+\end{lstlisting}
+The VBox (or any targetable component) has an extension
+function called button(). It accepts a text argument and an optional closure targeting a Button it will instantiate.\\\\
+When this function is called, it will create a Button with the specified text, apply the closure to it, add it to the VBox it was called on, and then return it.
+\begin{lstlisting}[language=Kotlin]
+import tornadofx.*
+import javafx.scene.control.TextField
+
+class tView : View() {
+    var firstNameField: TextField by singleAssign()
+    var lastNameField: TextField by singleAssign() 
+    /*recommended you use the singleAssign() delegates to
+ ensure the properties are only assigned once.*/
+    override val root = vbox {
+        hbox {
+            label("First Name")
+            firstNameField = textfield()
+        }
+        hbox {
+            label("Last Name")
+            lastNameField = textfield()
+        }
+        button("LOGIN") {
+            useMaxWidth = true
+            action {
+                println("Logging in as ${firstNameField.text} ${lastNameField.text}")
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+\section{Builders for Basic Controls}
+\subsection{Button}
+Button can optionally pass a text argument and a Button.() -> Unit lambda to modify its properties.
+\subsection{Label}
+label() extension function can be called to add a Label to a given Pane. Optionally you can provide a text (of type String or Property<String> ), a graphic (of type Node or ObjectProperty<Node> ) and a Label.() -> Unit lambda to modify its properties 
+\begin{lstlisting}[language=Kotlin]
+label("Lorem ipsum") {
+	textFill = Color.BLUE
+}
+\end{lstlisting}
+\subsection{TextField}
+\begin{lstlisting}[language=Kotlin]
+textfield("Input something") {
+	textProperty().addListener { obs, old, new ->
+		println("You typed: " + new)
+	}
+}
+\end{lstlisting}
+\subsection{Password Mode}
+\begin{lstlisting}[language=Kotlin]
+passwordfield("password123") {
+	requestFocus()
+}
+\end{lstlisting}
+Check Box
+\begin{lstlisting}[language=Kotlin]
+val booleanProperty = SimpleBooleanProperty()
+
+checkbox("Admin Mode", booleanProperty).action {
+	println(isSelected)
+}
+\end{lstlisting}
+ComboBox
+
+\begin{lstlisting}[language=Kotlin]
+val texasCities = FXCollections.observableArrayList("Austin",
+"Dallas","Midland", "San Antonio","Fort Worth")
+
+combobox<String> {
+	items = texasCities
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+val texasCities = FXCollections.observableArrayList("Austin",
+"Dallas","Midland","San Antonio","Fort Worth")
+
+val selectedCity = SimpleStringProperty()
+
+combobox(selectedCity, texasCities)
+\end{lstlisting}
+\subsection{ToggleButton}
+\begin{lstlisting}[language=Kotlin]
+togglebutton("OFF") {
+	action {
+		text = if (isSelected) "ON" else "OFF"
+	}
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+togglebutton {
+    val stateText = selectedProperty().stringBinding {
+    	if (it == true) "ON" else "OFF"
+    }
+    textProperty().bind(stateText)
+}
+\end{lstlisting}
+
+\subsection{Hyperlink and text}
+HyperLink
+
+\begin{lstlisting}[language=Kotlin]
+hyperlink("Open File").action { println("Opening file...") }
+\end{lstlisting}
+Text
+
+\begin{lstlisting}[language=Kotlin]
+text("Veni\nVidi\nVici") {
+	fill = Color.PURPLE
+	font = Font(20.0)
+}
+\end{lstlisting}
+Textflow
+
+\begin{lstlisting}[language=Kotlin]
+textflow {
+	text("Tornado") {
+		fill = Color.PURPLE
+		font = Font(20.0)
+	}
+	text("FX") {
+		fill = Color.ORANGE
+		font = Font(28.0)
+	}
+}
+\end{lstlisting}
+Tooltip
+
+\begin{lstlisting}[language=Kotlin]
+button("Commit") {
+	tooltip("Writes input to the database") {
+		font = Font.font("Verdana")
+	}
+}
+\end{lstlisting}
+Shortcut
+
+\begin{lstlisting}[language=Kotlin]
+shortcut("Ctrl+Y")) {
+	doSomething()
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+button("Save") {
+	action { doSave() }
+	shortcut("Ctrl+S")
+}
+\end{lstlisting}
+ProgressBar
+\begin{lstlisting}[language=Kotlin]
+progressbar(completion) {
+    progressProperty().addListener {
+        obsVal, old, new -> print("VALUE: $new")
+    }
+}
+\end{lstlisting}
+
+
+
+
+\section{Data Controls}
+
+ListView is similar to combobox, but it can scroll, with option to select multiple line.
+\begin{lstlisting}[language=Kotlin]
+listview<String> {
+	items.add("Alpha")
+	items.add("Beta")
+	items.add("Gamma")
+	items.add("Delta")
+	items.add("Epsilon")
+	selectionModel.selectionMode = SelectionMode.MULTIPLE
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+val greekLetters = listOf("Alpha","Beta",
+"Gamma","Delta","Epsilon").observable()
+
+listview(greekLetters) {
+	selectionModel.selectionMode = SelectionMode.MULTIPLE
+}
+\end{lstlisting}
+TableView
+
+\begin{lstlisting}[language=Kotlin]
+class Person(val id: Int, val name: String, val birthday:LocalDate) {
+	val age: Int get() = Period.between(birthday,LocalDate.now()).years
+}
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+private val persons = listOf(
+	Person(1,"Samantha Stuart",LocalDate.of(1981,12,4)),
+	Person(2,"Tom Marks",LocalDate.of(2001,1,23)),
+	Person(3,"Stuart Gills",LocalDate.of(1989,5,23)),
+	Person(3,"Nicole Williams",LocalDate.of(1998,8,11))
+).observable()
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+tableview(persons) {
+	column("ID",Person::id)
+	column("Name", Person::name)
+	column("Birthday", Person::birthday)
+	column("Age",Person::age)
+}
+//readonlyColumn() is immutable.
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+class Person(id: Int, name: String, birthday: LocalDate){
+	var id by property(id)
+	fun idProperty() = getProperty(Person::id)
+	var name by property(name)
+	fun nameProperty() = getProperty(Person::name)
+	var birthday by property(birthday)
+	fun birthdayProperty() = getProperty(Person::birthday)
+	val age: Int get() = Period.between(birthday, LocalDate.now()).years
+}
+//Delegation
+override val root = tableview(persons) {
+isEditable = true
+	column("ID",Person::idProperty).makeEditable()
+	column("Name", Person::nameProperty).makeEditable()
+	column("Birthday", Person::birthdayProperty).makeEditable()
+	column("Age",Person::age)
+}
+\end{lstlisting}
+Extension Function: useTextField(), useComboBox(), useChoiceBox(), useCheckBox(), useProgressBar() 
+\\\\
+Make the property private 
+\begin{lstlisting}[language=Kotlin]
+private val nameProperty = SimpleStringProperty(name)
+fun nameProperty() = nameProperty
+var name by nameProperty
+\end{lstlisting}
+cellFormat()
+
+\begin{lstlisting}[language=Kotlin]
+tableview(persons) {
+    column("ID", Person::id)
+    column("Name", Person::name)
+    column("Birthday", Person::birthday)
+    column("Age", Person::age).cellFormat {
+        text = it.toString()
+        style {
+            if (it < 18) {
+                backgroundColor += c("#8b0000")
+                textFill = Color.WHITE
+            } else {
+                backgroundColor += Color.WHITE
+                textFill = Color.BLACK
+            }
+        }
+    }
+}
+\end{lstlisting}
+Define the Property as the parent property, so it will update after View refreshed.
+\begin{lstlisting}[language=Kotlin]
+column("Parent name", Person::parentProperty).cellFormat{
+    textProperty().bind(it.parentProperty.value.nameProperty)
+}
+\end{lstlisting}
+This will reflect change immediately.
+\begin{lstlisting}[language=Kotlin]
+column<Person, String>("Parent name", { it.value.parentProperty.select(Person::nameProperty) })
+\end{lstlisting}
+\subsection{Row Expanders}
+\begin{lstlisting}[language=Kotlin]
+class Region(val id: Int, val name: String, val country: String, val branches: Observa
+             bleList<Branch>)
+class Branch(val id: Int, val facilityCode: String, val city: String, val stateProvince
+: String)
+val regions = listOf(
+        Region(1,"Pacific Northwest", "USA",listOf(
+                Branch(1,"D","Seattle","WA"),
+                Branch(2,"W","Portland","OR")
+        ).observable()),
+        Region(2,"Alberta", "Canada",listOf(
+                Branch(3,"W","Calgary","AB")
+        ).observable()),
+        Region(3,"Midwest", "USA", listOf(
+                Branch(4,"D","Chicago","IL"),
+                Branch(5,"D","Frankfort","KY"),
+                Branch(6, "W","Indianapolis", "IN")
+        ).observable())
+).observable()
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+override val root = tableview(regions) {
+    column("ID",Region::id)
+    column("Name", Region::name)
+    column("Country", Region::country)
+    rowExpander(expandOnDoubleClick = true) {
+        paddingLeft = expanderColumn.width
+        tableview(it.branches) {
+            column("ID",Branch::id)
+            column("Facility Code",Branch::facilityCode)
+            column("City",Branch::city)
+            column("State/Province",Branch::stateProvince)
+        }
+    }
+}
+\end{lstlisting}
+Add property to rowExpander
+\begin{lstlisting}[language=Kotlin]
+val expander = rowExpander(true) { ... }
+\end{lstlisting}
+
+\subsection{TreeView}
+
+\begin{lstlisting}[language=Kotlin]
+data class Person(val name: String, val department: String)
+val persons = listOf(
+        Person("Mary Hanes","Marketing"),
+        Person("Steve Folley","Customer Service"),
+        Person("John Ramsy","IT Help Desk"),
+        Person("Erlick Foyes","Customer Service"),
+        Person("Erin James","Marketing"),
+        Person("Jacob Mays","IT Help Desk"),
+        Person("Larry Cable","Customer Service")
+)
+\end{lstlisting}
+
+\begin{lstlisting}[language=Kotlin]
+// Create Person objects for the departments
+// with the department name as Person.name
+val departments = persons
+        .map { it.department }
+        .distinct().map { Person(it, "") }
+treeview<Person> {
+// Create root item
+    root = TreeItem(Person("Departments", ""))
+// Make sure the text in each TreeItem is the name of the Person
+    cellFormat { text = it.name }
+// Generate items. Children of the root item will contain departments
+    populate { parent ->
+        if (parent == root) departments else persons.filter { it.department == parent.
+                value.name }
+    }
+}
+\end{lstlisting}
+
+\end{document}
